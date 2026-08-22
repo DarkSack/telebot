@@ -1,105 +1,96 @@
-# 🤖 Price Tracker Bot (telebot)
+# telebot — Rastreador de precios de Amazon por Telegram
 
-Bot de **Telegram** que rastrea precios de productos de **Amazon**. Añádelo a tu chat, envía la URL de un producto y recibirás notificaciones automáticas cuando su precio baje.
+Bot personal de Telegram que **vigila los precios de productos de Amazon** por ti. Le pegas la URL de un producto, el bot lo scrape periódicamente y te avisa **por chat** cuando el precio baja. Guarda historial del precio más bajo registrado y te manda un resumen diario con el estado de todos los productos que sigues.
 
----
-
-## ✨ Características
-
-- 🛒 **Rastreo de precios** de productos de Amazon.
-- 🔔 **Alertas** instantáneas por Telegram cuando el precio baja.
-- 📊 **Resumen diario** con el estado de todos los productos que sigues.
-- ✏️ **Gestión sencilla** desde Telegram (`/add`, `/list`, `/edit`, `/remove`).
-- 🕒 **Cron interno** para revisar precios en intervalos configurables (via `node-cron`).
-- 💾 **Historial** del precio más bajo registrado por producto (persistido en `prices.json`).
+Ideal para no perderse esa oferta que llevas semanas esperando sin tener que revisar Amazon a mano todos los días.
 
 ---
 
-## ⚙️ Requisitos
+## Cómo se usa
 
-- **Node.js** ≥ 16
-- **npm**
-- **Google Chrome / Chromium** (Playwright lo instala automáticamente)
+1. **Instala** el bot en tu chat de Telegram (búscalo por su usuario o pon el token en tu propia instancia — ver setup).
+2. Envía `/start` para ver el menú.
+3. Añade productos con `/add <URL>` — el bot los guarda y arranca a vigilarlos.
+4. Cada vez que uno baja de precio, recibes una notificación con el precio nuevo, el anterior y el enlace al producto.
+5. Cada día a una hora fija, un **resumen** con todos los productos que sigues y su estado.
+
+### Comandos
+
+| Comando                     | Función                                                              |
+| --------------------------- | -------------------------------------------------------------------- |
+| `/start`                    | Mensaje de bienvenida + lista de comandos.                           |
+| `/add <URL>`                | Añade un producto de Amazon al rastreador.                           |
+| `/list`                     | Lista interactiva de todos los productos que sigues.                 |
+| `/check`                    | Fuerza una revisión inmediata (sin esperar al cron).                 |
+| `/edit <URL_old> <URL_new>` | Reemplaza la URL de un producto por otra.                            |
+| `/remove <URL>`             | Deja de rastrear un producto.                                        |
 
 ---
 
-## 🚀 Instalación y configuración
+## Bajo el capó
 
-### 1. Clonar el repositorio
+- **Bot:** `node-telegram-bot-api` en modo **polling** (no requiere webhook público).
+- **Scraper:** **Playwright** (Chromium headless) — visita cada producto, extrae `title` + precio con selectores robustos y sanitiza la URL de Amazon (le corta query strings y hash para deduplicar).
+- **Persistencia:** `prices.json` en disco — guarda:
+  ```json
+  {
+    "products": {
+      "https://www.amazon.es/dp/XYZ": {
+        "title": "…",
+        "lowest": 24.99,
+        "lastPrice": 27.50,
+        "history": [...],
+        "createdAt": "..."
+      }
+    },
+    "chats": [123456789]
+  }
+  ```
+- **Cron:** `node-cron` — revisiones periódicas + resumen diario a hora fija.
+- **HTTP auxiliar:** `axios` / `node-fetch` para llamadas puntuales fuera del scrape.
+
+---
+
+## Setup local
+
+### Requisitos
+
+- Node.js ≥ 16
+- Chromium (Playwright lo instala solo con `npx playwright install`)
+
+### Pasos
 
 ```bash
 git clone https://github.com/DarkSack/telebot.git
 cd telebot
-```
-
-### 2. Instalar dependencias
-
-```bash
 npm install
 npx playwright install chromium
 ```
 
-### 3. Variables de entorno
-
-Crea un archivo `.env` en la raíz:
+Crea un `.env` en la raíz:
 
 ```env
-TELEGRAM_TOKEN=tu_token_de_botfather
-# Opcional: ID del chat para envíos automáticos
-CHAT_ID=123456789
+TELEGRAM_TOKEN=xxxxxxxxx:AAA...    # Token de tu bot (habla con @BotFather)
 ```
 
-> Habla con [@BotFather](https://t.me/BotFather) en Telegram para crear tu bot y obtener el token.
-
-### 4. Ejecutar
+Arranca:
 
 ```bash
 npm start
+# → Bot online, escuchando comandos en Telegram
 ```
 
-El bot se conectará a Telegram y quedará listo para recibir comandos.
-
 ---
 
-## 📋 Comandos del bot
-
-| Comando                  | Descripción                                                   |
-| ------------------------ | ------------------------------------------------------------- |
-| `/start`                 | Mensaje de bienvenida y lista de comandos.                    |
-| `/add [URL]`             | Añade un producto de Amazon al rastreador.                    |
-| `/list`                  | Lista interactiva de todos los productos seguidos.            |
-| `/check`                 | Fuerza una revisión inmediata de precios.                     |
-| `/edit [URL_old] [URL_new]` | Cambia la URL de un producto existente.                    |
-| `/remove [URL]`          | Elimina un producto del rastreo.                              |
-
----
-
-## 🛠️ Stack
-
-- **Runtime:** Node.js (ESM)
-- **Telegram:** `node-telegram-bot-api`
-- **Scraping:** `playwright` (Chromium headless)
-- **Cron:** `node-cron`
-- **HTTP:** `axios` · `node-fetch`
-- **Env:** `dotenv`
-
----
-
-## 📁 Estructura
+## Estructura
 
 ```
 telebot/
-├── index.mjs         # Entrada principal (registra comandos + cron)
-├── prices.json       # Persistencia del historial de precios
+├── index.mjs        # Bot + comandos + cron + scraper (todo en un archivo)
+├── prices.json      # Persistencia (se crea al vuelo)
 ├── package.json
-└── .env              # (no versionado)
+└── .env             # No versionado
 ```
-
----
-
-## 🤝 Contribuciones
-
-_Issues_ y _pull requests_ son bienvenidos ✨.
 
 ---
 
