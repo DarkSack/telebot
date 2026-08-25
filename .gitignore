@@ -1,2 +1,11 @@
+node_modules/
 .env
-/node_modules
+.env.local
+
+# Store con datos personales (chat IDs + productos). NUNCA committear.
+prices.json
+!prices.json.example
+
+*.log
+.DS_Store
+Thumbs.db
