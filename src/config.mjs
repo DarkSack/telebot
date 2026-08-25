@@ -52,6 +52,15 @@ export const config = {
   playwrightTimeoutMs: optionalInt("PLAYWRIGHT_TIMEOUT_MS", 60_000),
   scrapePauseMs:       optionalInt("SCRAPE_PAUSE_MS", 900),
 
+  // Directorio para cookies + localStorage persistentes (contexto persistente
+  // = Amazon confía más en sesiones que ya visitaron el site). Empty → in-memory.
+  userDataDir:         process.env.USER_DATA_DIR ?? ".browser-profile",
+
+  // Reintentos ante fallo tipo captcha. `retryDelayMs` es el delay base;
+  // se aplica exponencial (delay * 2^i) hasta `maxRetries`.
+  scrapeRetries:       optionalInt("SCRAPE_RETRIES", 2),
+  scrapeRetryDelayMs:  optionalInt("SCRAPE_RETRY_DELAY_MS", 30_000),
+
   // User-Agent moderno para minimizar detección como bot.
   userAgent: process.env.USER_AGENT ??
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",

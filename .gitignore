@@ -6,6 +6,9 @@ node_modules/
 prices.json
 !prices.json.example
 
+# Perfil persistente del scraper (cookies + localStorage de Amazon).
+.browser-profile/
+
 *.log
 .DS_Store
 Thumbs.db
