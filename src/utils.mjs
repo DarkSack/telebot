@@ -21,8 +21,9 @@ export function sanitizeAmazonURL(url) {
   }
 }
 
-/** Escape para MarkdownV1 de Telegram. Cubre chars que rompen el parser. */
-export function escapeMD(text = "") {
+/** Escape para MarkdownV1 de Telegram. null/undefined → cadena vacía. */
+export function escapeMD(text) {
+  if (text == null) return "";
   return String(text).replace(/([\\_*\[\]()~`>#+\-=|{}.!])/g, "\\$1");
 }
 
