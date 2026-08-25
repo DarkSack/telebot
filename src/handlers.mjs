@@ -131,25 +131,35 @@ export function registerHandlers(bot) {
     });
     await saveDataNow();
 
-    await bot.editMessageText(
+    const successText =
 `✅ *Producto agregado exitosamente*
 
 📦 ${escapeMD(scraped.title)}
 💰 Precio actual: ${currencyFromUrl(sanitized)} ${scraped.price}
 📅 Agregado: ${new Date().toLocaleDateString()}
 
-🔔 Te notificaré cuando baje el precio.`,
-      {
-        chat_id: msg.chat.id,
-        message_id: loading.message_id,
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: [[
-            { text: "🛒 Ver en Amazon", url: sanitized },
-            { text: "📝 Ver todos", callback_data: "list" },
-          ]],
-        },
+🔔 Te notificaré cuando baje el precio.`;
+
+    const keyboard = {
+      inline_keyboard: [[
+        { text: "🛒 Ver en Amazon", url: sanitized },
+        { text: "📝 Ver todos", callback_data: "list" },
+      ]],
+    };
+
+    // Si tenemos imagen: borrar el "⏳ obteniendo…" y mandar photo con caption.
+    // Si no: solo editar el texto (que ya está allí).
+    if (scraped.imageUrl) {
+      await bot.deleteMessage(msg.chat.id, loading.message_id).catch(() => {});
+      await bot.sendPhoto(msg.chat.id, scraped.imageUrl, {
+        caption: successText, parse_mode: "Markdown", reply_markup: keyboard,
       });
+    } else {
+      await bot.editMessageText(successText, {
+        chat_id: msg.chat.id, message_id: loading.message_id,
+        parse_mode: "Markdown", reply_markup: keyboard,
+      });
+    }
   });
 
   // ── /check ────────────────────────────────────────────
