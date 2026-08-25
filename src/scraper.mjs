@@ -23,19 +23,17 @@ import { sleep } from "./utils.mjs";
 // Register stealth plugin (idempotente — safe si el módulo se re-importa).
 _chromium.use(stealth());
 
-let _context = null;
-// Dominios ya "calentados" recientemente (host → timestamp del último warmup).
-// Amazon empieza a servir captchas si haces N requests seguidos al mismo
-// /dp/ pattern sin re-tocar la homepage. Re-calentamos cada N minutos.
-const _warmedAt = new Map();
-const WARMUP_TTL_MS = 10 * 60 * 1000;   // 10 min
+// Cookies persistentes viven en disco (userDataDir); el context runtime se
+// recrea en cada scrape. Amazon detecta patrones per-session: si el mismo
+// context navega múltiples /dp/ en rápida sucesión → captcha aunque hayan
+// pasado minutos entre requests. Context nuevo = "sesión" nueva = detección
+// se reinicia.
+let _currentContext = null;
+// Dominios ya "calentados" — Set por host, se limpia con cada context nuevo.
+const _warmedHosts = new Set();
 
-async function ensureContext() {
-  if (_context) return _context;
-
-  // launchPersistentContext combina browser + context en uno solo.
-  // Usa un directorio de perfil para cookies/localStorage.
-  _context = await _chromium.launchPersistentContext(
+async function newContext() {
+  return _chromium.launchPersistentContext(
     path.resolve(config.userDataDir),
     {
       headless: true,
@@ -44,28 +42,33 @@ async function ensureContext() {
       viewport: { width: 1366, height: 768 },
       locale: "es-MX",
       timezoneId: "America/Mexico_City",
-      // Extra headers que Chrome real siempre envía.
       extraHTTPHeaders: {
         "Accept-Language": "es-MX,es;q=0.9,en;q=0.8",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
       },
     },
   );
-  log.info("browser context launched", { profileDir: config.userDataDir });
-  return _context;
 }
 
 export async function closeBrowser() {
-  if (_context) {
-    await _context.close().catch(() => {});
-    _context = null;
+  if (_currentContext) {
+    await _currentContext.close().catch(() => {});
+    _currentContext = null;
     log.info("browser context closed");
   }
 }
 
+/**
+ * Cada scrape usa un context nuevo. Cierra el anterior si existía. Cookies
+ * persisten en el userDataDir (disco), pero el context runtime es fresh
+ * → Amazon no ve una "sesión" haciendo grinding sobre /dp/.
+ */
 async function withPage(fn) {
-  const ctx = await ensureContext();
-  const page = await ctx.newPage();
+  await closeBrowser();
+  _warmedHosts.clear();   // Con context nuevo hay que re-calentar host
+  _currentContext = await newContext();
+  log.debug("browser context launched", { profileDir: config.userDataDir });
+  const page = await _currentContext.newPage();
   try { return await fn(page); }
   finally { await page.close().catch(() => {}); }
 }
@@ -88,17 +91,12 @@ function looksLikeAntibotBlock(err) {
 async function warmupHost(page, url) {
   let host;
   try { host = new URL(url).hostname; } catch { return; }
-
-  // Re-calentar cada WARMUP_TTL_MS. Amazon marca sospechoso un context que
-  // visita N /dp/ en rápida sucesión sin volver a la homepage.
-  const last = _warmedAt.get(host) ?? 0;
-  if (Date.now() - last < WARMUP_TTL_MS) return;
-
+  if (_warmedHosts.has(host)) return;
   const homepage = `https://${host}/`;
   try {
     await page.goto(homepage, { waitUntil: "domcontentloaded", timeout: config.playwrightTimeoutMs });
     await sleep(800 + Math.floor(Math.random() * 400));
-    _warmedAt.set(host, Date.now());
+    _warmedHosts.add(host);
     log.debug("host warmed", { host });
   } catch (err) {
     log.warn("warmup failed", { host, err: err.message });
