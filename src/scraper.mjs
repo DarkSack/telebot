@@ -24,9 +24,11 @@ import { sleep } from "./utils.mjs";
 _chromium.use(stealth());
 
 let _context = null;
-// Dominios ya "calentados" en esta ejecución (visita a homepage previa).
-// Amazon confía más en un context que ya tocó su homepage → menos captchas.
-const _warmedHosts = new Set();
+// Dominios ya "calentados" recientemente (host → timestamp del último warmup).
+// Amazon empieza a servir captchas si haces N requests seguidos al mismo
+// /dp/ pattern sin re-tocar la homepage. Re-calentamos cada N minutos.
+const _warmedAt = new Map();
+const WARMUP_TTL_MS = 10 * 60 * 1000;   // 10 min
 
 async function ensureContext() {
   if (_context) return _context;
@@ -86,12 +88,17 @@ function looksLikeAntibotBlock(err) {
 async function warmupHost(page, url) {
   let host;
   try { host = new URL(url).hostname; } catch { return; }
-  if (_warmedHosts.has(host)) return;
+
+  // Re-calentar cada WARMUP_TTL_MS. Amazon marca sospechoso un context que
+  // visita N /dp/ en rápida sucesión sin volver a la homepage.
+  const last = _warmedAt.get(host) ?? 0;
+  if (Date.now() - last < WARMUP_TTL_MS) return;
+
   const homepage = `https://${host}/`;
   try {
     await page.goto(homepage, { waitUntil: "domcontentloaded", timeout: config.playwrightTimeoutMs });
     await sleep(800 + Math.floor(Math.random() * 400));
-    _warmedHosts.add(host);
+    _warmedAt.set(host, Date.now());
     log.debug("host warmed", { host });
   } catch (err) {
     log.warn("warmup failed", { host, err: err.message });
