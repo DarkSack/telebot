@@ -3,7 +3,7 @@ node_modules/
 .env.local
 
 # Store con datos personales (chat IDs + productos). NUNCA committear.
-prices.json
+prices*.json
 !prices.json.example
 
 # Perfil persistente del scraper (cookies + localStorage de Amazon).
